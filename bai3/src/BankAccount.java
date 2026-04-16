@@ -51,9 +51,10 @@ class Main {
         a.start();
         b.start();
         try {
-            a.join(); // chờ thằng a làm xong mới b mới cha
+            a.join(); // thang main chờ a với b chạy xong
             b.join();
         } catch (InterruptedException e) {
+            //1 thread co thể bị ngắt giua chung
         }
     }
 }
