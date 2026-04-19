@@ -56,5 +56,6 @@ class Main {
         } catch (InterruptedException e) {
             //1 thread co thể bị ngắt giua chung
         }
+        System.out.println("Final balance: " + bankAccount.getBalance());
     }
 }
