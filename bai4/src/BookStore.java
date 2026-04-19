@@ -4,54 +4,44 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 class BookStore {
-    // 1. Khai báo kho chứa sách và bộ khóa
     private final Map<String, Integer> stock = new HashMap<>();
-    //hashmap khong an toan trong multithreading
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
-    //khóa
     private final Lock readLock = rwLock.readLock();
     private final Lock writeLock = rwLock.writeLock();
 
-    // 2. Phương thức xem số lượng sách (Đọc)
     public void getStock(String title) {
-        readLock.lock(); // Xin khóa đọc
+        readLock.lock(); // Khóa đọc
         try {
             System.out.println(Thread.currentThread().getName() + " đang kiểm tra sách: " + title);
-            Thread.sleep(500); // Giả lập thời gian đọc dữ liệu mất 0.5s
-
-            // Lấy số lượng, nếu không có thì trả về 0
+            Thread.sleep(500);
             int count = stock.getOrDefault(title, 0);
             System.out.println(Thread.currentThread().getName() + " thấy có " + count + " quyển " + title);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
-            readLock.unlock(); // Bắt buộc phải trả khóa trong finally
+            readLock.unlock();
         }
     }
 
-    // 3. Phương thức nhập thêm sách (Ghi)
     public void addBook(String title, int qty) {
-        writeLock.lock(); // Xin khóa ghi (Độc quyền)
+        writeLock.lock(); // Khóa ghi
         try {
             System.out.println(">>> " + Thread.currentThread().getName() + " BẮT ĐẦU nhập " + qty + " quyển " + title);
-            Thread.sleep(1000); // Giả lập thời gian nhập sách mất 1s
-
-            // Cập nhật số lượng
+            Thread.sleep(1000);
             stock.put(title, stock.getOrDefault(title, 0) + qty);
-            System.out.println(">>> " + Thread.currentThread().getName() + " ĐÃ NHẬP XONG. Tổng cập nhật: " + stock.get(title));
+            System.out.println(">>> " + Thread.currentThread().getName() + " ĐÃ NHẬP XONG. Tổng: " + stock.get(title));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
-            writeLock.unlock(); // Nhả khóa ghi
+            writeLock.unlock();
         }
     }
 
-    // 4. Phương thức mượn sách (Ghi)
     public void borrow(String title, int qty) {
-        writeLock.lock(); // Xin khóa ghi (Độc quyền)
+        writeLock.lock(); // Khóa ghi
         try {
             System.out.println("<<< " + Thread.currentThread().getName() + " BẮT ĐẦU mượn " + qty + " quyển " + title);
-            Thread.sleep(1000); // Giả lập thời gian xử lý mượn sách
+            Thread.sleep(1000);
 
             int currentQty = stock.getOrDefault(title, 0);
             if (currentQty >= qty) {
@@ -63,31 +53,76 @@ class BookStore {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
-            writeLock.unlock(); // Nhả khóa ghi
+            writeLock.unlock();
         }
     }
 }
+class ReaderTask implements Runnable {
+    private BookStore store;
+    private String title;
 
+    // Constructor để truyền cái nhà sách và tên sách vào
+    public ReaderTask(BookStore store, String title) {
+        this.store = store;
+        this.title = title;
+    }
+
+    @Override
+    public void run() {
+        store.getStock(title); // Gọi hàm đọc sách
+    }
+}
+
+class BorrowBookTask implements Runnable {
+    private BookStore store;
+    private String title;
+    private int qty;
+
+    public BorrowBookTask(BookStore store, String title, int qty) {
+        this.store = store;
+        this.title = title;
+        this.qty = qty;
+    }
+
+    @Override
+    public void run() {
+        store.borrow(title, qty); // Gọi hàm mượn sách
+    }
+}
+class AddBookTask implements Runnable {
+    private BookStore store;
+    private String title;
+    private int qty;
+
+    public AddBookTask(BookStore store, String title, int qty) {
+        this.store = store;
+        this.title = title;
+        this.qty = qty;
+    }
+
+    @Override
+    public void run() {
+        store.addBook(title, qty); // Gọi hàm thêm sách
+    }
+}
 public class Main {
     public static void main(String[] args) {
         BookStore store = new BookStore();
+        store.addBook("Java", 10); // Khởi tạo trước 10 quyển sách
+        Runnable readJob = new ReaderTask(store, "Java");
+        Runnable borrowJob = new BorrowBookTask(store, "Java", 5);
+        Runnable addJob = new AddBookTask(store, "Java", 3);
 
-        // Khởi tạo sách có sẵn trước khi chạy đa luồng
-        store.addBook("Java", 10);
+        Thread r1 = new Thread(readJob, "Reader-1");
+        Thread r2 = new Thread(readJob, "Reader-2");
+        Thread r3 = new Thread(readJob, "Reader-3");
 
-        // Tạo 3 luồng đọc (Sử dụng Lambda cho ngắn gọn)
-        Thread r1 = new Thread(() -> store.getStock("Java"), "Reader-1");
-        Thread r2 = new Thread(() -> store.getStock("Java"), "Reader-2");
-        Thread r3 = new Thread(() -> store.getStock("Java"), "Reader-3");
+        Thread w1 = new Thread(borrowJob, "Writer-Borrow");
+        Thread w2 = new Thread(addJob, "Writer-Add");
 
-        // Tạo 2 luồng ghi
-        Thread w1 = new Thread(() -> store.borrow("Java", 5), "Writer-Borrow");
-        Thread w2 = new Thread(() -> store.addBook("Java", 3), "Writer-Add");
-
-        // Khởi động tất cả các luồng cùng lúc
         r1.start();
         r2.start();
-        w1.start(); // Cố tình xen kẽ luồng ghi vào giữa
+        w1.start();
         r3.start();
         w2.start();
     }
