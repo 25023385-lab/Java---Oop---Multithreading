@@ -105,7 +105,7 @@ class AddBookTask implements Runnable {
         store.addBook(title, qty); // Gọi hàm thêm sách
     }
 }
-public class Main {
+class Main {
     public static void main(String[] args) {
         BookStore store = new BookStore();
         store.addBook("Java", 10); // Khởi tạo trước 10 quyển sách
